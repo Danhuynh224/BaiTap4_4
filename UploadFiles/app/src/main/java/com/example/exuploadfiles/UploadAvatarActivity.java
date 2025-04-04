@@ -25,6 +25,9 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import com.bumptech.glide.Glide;
 
+import org.json.JSONArray;
+import org.json.JSONObject;
+
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
@@ -33,6 +36,7 @@ import de.hdodenhof.circleimageview.CircleImageView;
 import okhttp3.MediaType;
 import okhttp3.MultipartBody;
 import okhttp3.RequestBody;
+import okhttp3.ResponseBody;
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
@@ -104,30 +108,71 @@ public class UploadAvatarActivity extends AppCompatActivity {
         RequestBody id = RequestBody.create(MediaType.parse("text/plain"), "5");
 
 
-        ServiceAPI.serviceapi.upload(id, partbodyavatar).enqueue(new Callback<ApiResponse>() {
-
+        ServiceAPI.serviceapi.upload(id, partbodyavatar).enqueue(new Callback<ResponseBody>() {
+//            @Override
+//            public void onResponse(Call<ApiResponse> call, Response<ApiResponse> response) {
+//                mProgressDialog.dismiss();
+//                if (response.isSuccessful() && response.body() != null) {
+//                    Log.d("API_RESPONSE", response.body().toString());
+//                    ApiResponse apiResponse = response.body();
+//                    if (apiResponse.getResult() != null)
+//                        Glide.with(UploadAvatarActivity.this)
+//                                .load(apiResponse.getResult().get(0).getImages())
+//                                .into(imgAvatar);
+//                        Toast.makeText(UploadAvatarActivity.this, "Thành công", Toast.LENGTH_LONG).show();
+//                    } else {
+//                        Toast.makeText(UploadAvatarActivity.this, "Thất bại", Toast.LENGTH_SHORT).show();
+//                    }
+//                }
             @Override
-            public void onResponse(Call<ApiResponse> call, Response<ApiResponse> response) {
+            public void onResponse(Call<ResponseBody> call, Response<ResponseBody> response) {
                 mProgressDialog.dismiss();
                 if (response.isSuccessful() && response.body() != null) {
-                    Log.d("API_RESPONSE", response.body().toString());
-                    ApiResponse apiResponse = response.body();
-                    if (apiResponse.getResult() != null)
-                        Glide.with(UploadAvatarActivity.this)
-                                .load(apiResponse.getResult().get(0).getImages())
-                                .into(imgAvatar);
-                        Toast.makeText(UploadAvatarActivity.this, "Thành công", Toast.LENGTH_LONG).show();
-                    } else {
-                        Toast.makeText(UploadAvatarActivity.this, "Thất bại", Toast.LENGTH_SHORT).show();
+                    try {
+                        String raw = response.body().string();
+                        // Cắt bỏ warning HTML nếu có
+                        int jsonStart = raw.indexOf('{');
+                        if (jsonStart != -1) {
+                            String jsonClean = raw.substring(jsonStart);
+                            JSONObject jsonObject = new JSONObject(jsonClean);
+                            boolean success = jsonObject.getBoolean("success");
+                            String message = jsonObject.getString("message");
+
+                            if (jsonObject.has("result") && !jsonObject.isNull("result")) {
+                                JSONArray resultArray = jsonObject.getJSONArray("result");
+                                if (resultArray.length() > 0) {
+                                    JSONObject firstItem = resultArray.getJSONObject(0);
+                                    if (firstItem.has("images")) {
+                                        String imageUrl = firstItem.getString("images");
+
+                                        // Dùng Glide để hiển thị ảnh
+                                        Glide.with(UploadAvatarActivity.this)
+                                                .load(imageUrl)
+                                                .into(imgAvatar);
+                                    }
+                                }
+                            }
+
+                            Toast.makeText(UploadAvatarActivity.this, message, Toast.LENGTH_SHORT).show();
+                            Log.d("CLEAN_JSON", jsonClean);
+                        } else {
+                            Toast.makeText(UploadAvatarActivity.this, "Không tìm thấy JSON", Toast.LENGTH_SHORT).show();
+                        }
+
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                        Toast.makeText(UploadAvatarActivity.this, "Lỗi xử lý phản hồi", Toast.LENGTH_SHORT).show();
                     }
+                } else {
+                    Toast.makeText(UploadAvatarActivity.this, "Phản hồi không thành công", Toast.LENGTH_SHORT).show();
                 }
+            }
 
             @Override
-            public void onFailure(Call<ApiResponse> call, Throwable t) {
+            public void onFailure(Call<ResponseBody> call, Throwable t) {
                 mProgressDialog.dismiss();
-                Toast.makeText(UploadAvatarActivity.this, "Lỗi kết nối: " + t.getMessage(), Toast.LENGTH_LONG).show();
-                btnUpload.setText(t.getMessage());
-                Log.e("UploadError", "Lỗi: " + t.getMessage());
+                Log.e("UploadError", "onFailure: " + t.getMessage(), t); // log chi tiết
+                Toast.makeText(UploadAvatarActivity.this, "Lỗi: " + t.getLocalizedMessage(), Toast.LENGTH_LONG).show();
             }
         });
 

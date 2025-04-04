@@ -32,7 +32,7 @@ public interface ServiceAPI {
 
     @Multipart
     @POST("updateimages.php")
-    Call<ApiResponse> upload(
+    Call<ResponseBody> upload(
             @Part("id") RequestBody id,
             @Part MultipartBody.Part images
     );
